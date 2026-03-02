@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct AgentDetailView: View {
+    @EnvironmentObject var state: StampedeState
     let agent: Agent
     var body: some View {
         ScrollView {
@@ -9,8 +10,14 @@ struct AgentDetailView: View {
                     Image(systemName: agent.status.sfSymbol).font(.system(size: 18)).foregroundColor(agent.status.color)
                     Text(agent.name.uppercased()).font(.system(size: 18, weight: .bold, design: .monospaced)).foregroundColor(StampedeColors.goldBright)
                 }
-                Text(agent.status.label).font(.system(size: 11, weight: .bold, design: .monospaced)).foregroundColor(agent.status.color)
-                    .padding(.horizontal, 8).padding(.vertical, 3).background(agent.status.color.opacity(0.12)).cornerRadius(4)
+                HStack(spacing: 8) {
+                    Text(agent.status.label).font(.system(size: 11, weight: .bold, design: .monospaced)).foregroundColor(agent.status.color)
+                        .padding(.horizontal, 8).padding(.vertical, 3).background(agent.status.color.opacity(0.12)).cornerRadius(4)
+                    if let model = agent.model {
+                        Text(model).font(.system(size: 10, design: .monospaced)).foregroundColor(StampedeColors.textTertiary)
+                            .padding(.horizontal, 6).padding(.vertical, 2).background(StampedeColors.bgElevated).cornerRadius(3)
+                    }
+                }
                 Divider().background(StampedeColors.border)
                 DetailSection(title: "TASK") { Text(agent.task).font(.system(size: 12)).foregroundColor(StampedeColors.textPrimary) }
                 DetailSection(title: "BRANCH") {
@@ -36,14 +43,26 @@ struct AgentDetailView: View {
                         MetricBox(label: "PID", value: agent.pid.map(String.init) ?? "—", color: StampedeColors.gray)
                     }
                 }
-                DetailSection(title: "ACTIVITY") {
-                    Text(agent.activity).font(.system(size: 11, design: .monospaced)).foregroundColor(StampedeColors.textSecondary)
+                if let files = agent.filesChanged, !files.isEmpty {
+                    DetailSection(title: "FILES CHANGED (\(files.count))") {
+                        VStack(alignment: .leading, spacing: 3) {
+                            ForEach(files, id: \.self) { file in
+                                Text(file).font(.system(size: 10, design: .monospaced)).foregroundColor(StampedeColors.cyan)
+                            }
+                        }.padding(8).frame(maxWidth: .infinity, alignment: .leading).background(StampedeColors.bgElevated).cornerRadius(4)
+                    }
+                }
+                DetailSection(title: agent.summary != nil ? "SUMMARY" : "ACTIVITY") {
+                    Text(agent.summary ?? agent.activity).font(.system(size: 11, design: .monospaced)).foregroundColor(StampedeColors.textSecondary)
                         .padding(8).frame(maxWidth: .infinity, alignment: .leading).background(StampedeColors.bgElevated).cornerRadius(4)
                 }
-                Button(action: {}) { HStack { Image(systemName: "terminal"); Text("Open Terminal") }.frame(maxWidth: .infinity) }.buttonStyle(.bordered)
+                Button(action: { state.openTerminal() }) {
+                    HStack { Image(systemName: "terminal"); Text("Open Terminal") }.frame(maxWidth: .infinity)
+                }.buttonStyle(.bordered)
                 if agent.status == .failed {
-                    Button(action: {}) { HStack { Image(systemName: "arrow.clockwise"); Text("Retry Agent") }.frame(maxWidth: .infinity) }
-                        .buttonStyle(.borderedProminent).tint(StampedeColors.orange)
+                    Button(action: { state.retryAgent(agent) }) {
+                        HStack { Image(systemName: "arrow.clockwise"); Text("Retry Agent") }.frame(maxWidth: .infinity)
+                    }.buttonStyle(.borderedProminent).tint(StampedeColors.orange)
                 }
             }.padding(16)
         }.background(StampedeColors.bgSurface)

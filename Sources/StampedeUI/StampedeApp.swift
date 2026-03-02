@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct StampedeApp: App {
-    @StateObject private var state = StampedeState.demo()
+    @StateObject private var state = StampedeState()
 
     var body: some Scene {
         WindowGroup {
@@ -14,7 +14,7 @@ struct StampedeApp: App {
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
-        .commands { StampedeCommands() }
+        .commands { StampedeCommands(state: state) }
 
         MenuBarExtra("Stampede", systemImage: "bolt.fill") {
             MenuBarView().environmentObject(state)
@@ -25,21 +25,34 @@ struct StampedeApp: App {
 }
 
 struct StampedeCommands: Commands {
+    @ObservedObject var state: StampedeState
     var body: some Commands {
         CommandGroup(after: .newItem) {
-            Button("New Stampede Run…") {}.keyboardShortcut("n", modifiers: [.command, .shift])
+            Button("Refresh") { state.refresh() }.keyboardShortcut("r", modifiers: .command)
             Divider()
-            Button("Focus Next Agent") {}.keyboardShortcut("]", modifiers: .command)
-            Button("Focus Previous Agent") {}.keyboardShortcut("[", modifiers: .command)
+            Button("Focus Next Agent") {
+                state.focusAgent(at: -1)
+            }.keyboardShortcut("]", modifiers: .command)
+            Button("Focus Previous Agent") {
+                state.focusAgent(at: -2)
+            }.keyboardShortcut("[", modifiers: .command)
         }
         CommandMenu("Agents") {
-            Button("Show All Agents") {}.keyboardShortcut("0", modifiers: .command)
+            Button("Show All Agents") {
+                state.focusAgent(at: 0)
+            }.keyboardShortcut("0", modifiers: .command)
             Divider()
             ForEach(1...9, id: \.self) { i in
-                Button("Focus Agent \(i)") {}.keyboardShortcut(KeyEquivalent(Character(String(i))), modifiers: .command)
+                Button("Focus Agent \(i)") {
+                    state.focusAgent(at: i)
+                }.keyboardShortcut(KeyEquivalent(Character(String(i))), modifiers: .command)
             }
             Divider()
-            Button("Retry Failed Agents") {}.keyboardShortcut("r", modifiers: [.command, .shift])
+            Button("Retry Failed Agents") {
+                for agent in state.agents where agent.status == .failed {
+                    state.retryAgent(agent)
+                }
+            }.keyboardShortcut("r", modifiers: [.command, .shift])
         }
     }
 }
@@ -67,7 +80,22 @@ struct ContentView: View {
                 }
             }
             if !state.conflicts.isEmpty { ConflictBarView(showDetails: $showConflicts) }
-        }.background(StampedeColors.bgDeep)
+        }
+        .background(StampedeColors.bgDeep)
+        .onReceive(NotificationCenter.default.publisher(for: .stampedeFocusAgent)) { notif in
+            guard let index = notif.object as? Int else { return }
+            if index == 0 { selectedAgent = nil }
+            else if index > 0 && index <= state.agents.count { selectedAgent = state.agents[index - 1] }
+            else if index == -1 { // next
+                if let current = selectedAgent, let idx = state.agents.firstIndex(where: { $0.id == current.id }) {
+                    selectedAgent = state.agents[(idx + 1) % state.agents.count]
+                } else { selectedAgent = state.agents.first }
+            } else if index == -2 { // previous
+                if let current = selectedAgent, let idx = state.agents.firstIndex(where: { $0.id == current.id }) {
+                    selectedAgent = state.agents[(idx - 1 + state.agents.count) % state.agents.count]
+                } else { selectedAgent = state.agents.last }
+            }
+        }
     }
 }
 
@@ -80,6 +108,16 @@ struct ToolbarView: View {
             HStack(spacing: 6) {
                 Text("⚡").font(.system(size: 16))
                 Text("STAMPEDE").font(.system(size: 13, weight: .bold, design: .monospaced)).foregroundColor(StampedeColors.goldBright)
+            }
+            // LIVE / DEMO badge
+            Text(state.isLive ? "LIVE" : "DEMO")
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundColor(state.isLive ? StampedeColors.green : StampedeColors.orange)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background((state.isLive ? StampedeColors.green : StampedeColors.orange).opacity(0.15))
+                .cornerRadius(3)
+            if let runId = state.runId, state.isLive {
+                Text(runId).font(.system(size: 10, design: .monospaced)).foregroundColor(StampedeColors.textTertiary)
             }
             Divider().frame(height: 16)
             Picker("View", selection: $viewMode) {

@@ -35,6 +35,11 @@ struct Agent: Identifiable, Codable {
     var elapsedSeconds: Int
     var activity: String
     var pid: Int?
+    var model: String?
+    var filesChanged: [String]?
+    var summary: String?
+    var completedAt: String?
+    var workerId: String?
 
     var formattedTokens: String {
         if tokensUsed >= 1_000_000 { return String(format: "%.1fM", Double(tokensUsed) / 1_000_000) }
@@ -48,6 +53,36 @@ struct Agent: Identifiable, Codable {
         return "\(s)s"
     }
     var estimatedCost: Double { Double(tokensUsed) / 250_000.0 }
+}
+
+// JSON shapes from terminal-stampede filesystem IPC
+
+struct FleetEntry: Codable {
+    let model: String
+    let slot: Int
+}
+
+struct TaskResult: Codable {
+    let task_id: String?
+    let run_id: String?
+    let worker_id: String?
+    let status: String?
+    let branch: String?
+    let files_changed: [String]?
+    let summary: String?
+    let completed_at: String?
+    let word_count: Int?
+}
+
+struct RunState: Codable {
+    let run_id: String?
+    let objective: String?
+    let repo_path: String?
+    let model: String?
+    let worker_count: Int?
+    let total_tasks: Int?
+    let phase: String?
+    let updated_at: String?
 }
 
 struct FileConflict: Identifiable {

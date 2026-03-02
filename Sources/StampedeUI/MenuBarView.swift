@@ -7,8 +7,16 @@ struct MenuBarView: View {
             HStack {
                 Text("⚡"); Text("Terminal Stampede").font(.system(size: 13, weight: .bold, design: .monospaced)).foregroundColor(StampedeColors.goldBright)
                 Spacer()
-                if state.isRunning { PulsingDot(color: StampedeColors.green); Text("LIVE").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundColor(StampedeColors.green) }
+                if state.isLive {
+                    PulsingDot(color: StampedeColors.green)
+                    Text("LIVE").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundColor(StampedeColors.green)
+                } else {
+                    Text("DEMO").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundColor(StampedeColors.orange)
+                }
             }.padding(.horizontal, 12).padding(.vertical, 10)
+            if let runId = state.runId, state.isLive {
+                Text(runId).font(.system(size: 10, design: .monospaced)).foregroundColor(StampedeColors.textTertiary).padding(.horizontal, 12)
+            }
             Divider()
             HStack(spacing: 16) {
                 QuickStat(label: "Active", value: "\(state.activeCount)", color: StampedeColors.green)
@@ -63,7 +71,8 @@ struct PulsingDot: View {
 }
 
 struct PreferencesView: View {
-    @AppStorage("stampedeDir") private var stampedeDir = "/tmp/stampede"
+    @EnvironmentObject var state: StampedeState
+    @AppStorage("stampedeDir") private var stampedeDir = ""
     @AppStorage("refreshRate") private var refreshRate = 1.0
     @AppStorage("maxAgents") private var maxAgents = 8
     @AppStorage("showNotifications") private var showNotifications = true
@@ -71,7 +80,30 @@ struct PreferencesView: View {
     var body: some View {
         TabView {
             Form {
-                Section("Directory") { TextField("Path", text: $stampedeDir).font(.system(.body, design: .monospaced)) }
+                Section("Directory") {
+                    TextField("Path (empty = ~/.copilot/stampede)", text: $stampedeDir).font(.system(.body, design: .monospaced))
+                    Button("Reconnect") {
+                        state.stopMonitoring()
+                        if let dir = state.discoverLatestRun() {
+                            state.switchToRun(dir)
+                        } else {
+                            state.loadDemo()
+                        }
+                    }
+                }
+                Section("Recent Runs") {
+                    ForEach(state.availableRuns(), id: \.id) { run in
+                        Button(action: { state.switchToRun(run.url) }) {
+                            HStack {
+                                Text(run.id).font(.system(size: 11, design: .monospaced))
+                                Spacer()
+                                if state.runId == run.id {
+                                    Image(systemName: "checkmark").foregroundColor(StampedeColors.green)
+                                }
+                            }
+                        }.buttonStyle(.borderless)
+                    }
+                }
                 Section("Agents") {
                     Stepper("Max agents: \(maxAgents)", value: $maxAgents, in: 1...20)
                     Slider(value: $refreshRate, in: 0.5...5.0, step: 0.5) { Text("Refresh: \(refreshRate, specifier: "%.1f")s") }
