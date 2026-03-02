@@ -6,6 +6,9 @@ A SwiftUI dashboard that monitors your multi-agent orchestration runs in real ti
 
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-blue) ![Swift 5.9+](https://img.shields.io/badge/Swift-5.9%2B-orange) ![License: MIT](https://img.shields.io/badge/License-MIT-green)
 
+![Stampede App Demo](docs/stampede-demo.gif)
+*Build, launch, and monitor — the macOS app opens alongside the terminal dashboard*
+
 ## Quick Start
 
 ```bash
